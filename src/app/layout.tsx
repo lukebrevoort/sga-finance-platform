@@ -23,21 +23,19 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased bg-gray-50 min-h-screen`}>
         {/* Header */}
         <header className="bg-[#A32638] text-white shadow-lg">
-          <div className="max-w-6xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between">
+          <div className="max-w-6xl mx-auto px-4 py-3 sm:px-6 lg:px-8">
+            <div className="flex items-center">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                  <span className="text-[#A32638] font-bold text-lg">SGA</span>
-                </div>
+                <img 
+                  src="/sgalogo.jpeg" 
+                  alt="Stevens SGA Logo" 
+                  className="w-12 h-12 rounded-full bg-white object-contain"
+                />
                 <div>
                   <h1 className="text-xl font-bold">SGA Finance Platform</h1>
                   <p className="text-red-200 text-sm">Stevens Institute of Technology</p>
                 </div>
               </div>
-              <nav className="hidden sm:flex items-center gap-6 text-sm">
-                <a href="#" className="hover:text-red-200 transition-colors">Home</a>
-                <a href="#instructions" className="hover:text-red-200 transition-colors">Instructions</a>
-              </nav>
             </div>
           </div>
         </header>

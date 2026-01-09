@@ -442,6 +442,180 @@ None required for MVP (no external APIs or databases).
 
 ---
 
+## Phase 2: Master Spreadsheet Management
+
+### Overview
+
+The Master Spreadsheet feature allows the VP of Finance to:
+1. **Create** a new semester budget tracking workbook
+2. **Merge** pending requests into an existing master each week
+3. **Track** remaining budget automatically with Excel formulas
+
+### User Workflow
+
+#### Flow 4: Create New Master Spreadsheet
+```
+User clicks "Create Master Spreadsheet"
+    ↓
+Enters: Semester name (e.g., "Spring 2026")
+        Starting AFR budget (e.g., $200,000.00)
+        First meeting date (auto-suggests next Sunday)
+    ↓
+System generates .xlsx with two sheets:
+    - Sheet 1: AFR Requests (with budget tracking)
+    - Sheet 2: Reallocation Requests (simple tracking)
+    ↓
+User downloads master spreadsheet template
+```
+
+#### Flow 5: Weekly Merge to Master
+```
+User has pending requests CSV from CampusGroups
+    ↓
+User uploads: Existing master .xlsx + Pending CSV
+    ↓
+System auto-detects meeting date (next Sunday)
+    ↓
+Appends new requests to appropriate sheet
+    - AFR requests → AFR sheet
+    - Reallocation requests → Reallocation sheet
+    ↓
+Adds weekly subtotal and remaining budget rows
+    ↓
+User downloads updated master
+```
+
+### Sheet 1: AFR Requests
+
+#### Structure
+```
+Row 1: Column Headers (frozen)
+Row 2: [Semester Name] section header | Starting Budget: $XXX,XXX.XX (in col I)
+Row 3+: Week 1 data rows
+Row N: Weekly Subtotal (Final Amount sum)
+Row N+1: Remaining Budget (Previous - Subtotal)
+[Blank row]
+[Repeat for each week]
+```
+
+#### Columns
+| Column | Letter | On Import | Formula/Behavior |
+|--------|--------|-----------|------------------|
+| Date of Meeting | A | Auto (next Sunday) | First row of each week only |
+| Notes | B | Blank | Manual during meeting |
+| Organization | C | From CSV (numbered) | "SGA 1", "SGA 2", etc. |
+| AFR'd | D | From CSV | Requested amount |
+| Amended | E | Formula | `= D - F` (AFR'd - After Amendments) |
+| After Amendments | F | Blank | Filled during meeting |
+| Status | G | Blank | "Approved" or "Denied" |
+| Final Amount | H | Formula | `= IF(G="Approved", F, 0)` |
+| Name of Org | I | Same as C | For KFS reference |
+| Entered in KFS? | J | Blank | Post-meeting tracking |
+| Account Number | K | From CSV | |
+
+#### Weekly Summary Rows
+- **Weekly Subtotal Row**: `= SUM(H:H)` for that week's Final Amount column
+  - Only Approved items contribute (since Final Amount = 0 for Denied)
+- **Remaining Budget Row**: `= [Previous Remaining] - [Weekly Subtotal]`
+  - First week: Starting Budget - Week 1 Subtotal
+  - Week N: Week N-1 Remaining - Week N Subtotal
+
+### Sheet 2: Reallocation Requests
+
+#### Structure (Simplified)
+No budget pool tracking - just a record of requests.
+
+```
+Row 1: Column Headers (frozen)
+Row 2: [Semester Name] section header
+Row 3+: Data rows (organized by week)
+```
+
+#### Columns
+| Column | Letter | On Import | Notes |
+|--------|--------|-----------|-------|
+| Date of Meeting | A | Auto (next Sunday) | |
+| Notes | B | Blank | Manual notes |
+| Organization | C | From CSV (numbered) | |
+| Requested Amount | D | From CSV | Amount to reallocate |
+| Approved Amount | E | Blank | Filled during meeting |
+| Status | F | Blank | "Approved" or "Denied" |
+| Account Number | G | From CSV | |
+
+### Meeting Date Auto-Calculation
+
+```typescript
+function getNextSunday(fromDate: Date = new Date()): Date {
+  const date = new Date(fromDate);
+  const dayOfWeek = date.getDay(); // 0 = Sunday
+  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+  date.setDate(date.getDate() + daysUntilSunday);
+  return date;
+}
+```
+
+Example:
+- Friday Jan 9th → Sunday Jan 11th
+- Sunday Jan 11th → Sunday Jan 11th (same day)
+- Monday Jan 12th → Sunday Jan 18th
+
+### API Endpoints
+
+#### POST /api/create-master
+**Input**:
+```typescript
+{
+  semesterName: string;      // "Spring 2026"
+  startingBudget: number;    // 200000.00
+  meetingDate?: string;      // Optional override, ISO date
+}
+```
+**Output**: Binary .xlsx file
+
+#### POST /api/merge-spreadsheet (Updated)
+**Input**: FormData with:
+- `master`: Existing .xlsx file
+- `pending`: CSV file with pending requests
+- `meetingDate`: Optional date override
+**Output**: Binary .xlsx file (merged)
+
+### Excel Formula Examples
+
+For a week with data in rows 3-10:
+
+```excel
+# Amended (Column E, Row 3)
+=D3-F3
+
+# Final Amount (Column H, Row 3)  
+=IF(G3="Approved",F3,0)
+
+# Weekly Subtotal (Row 11)
+=SUM(H3:H10)
+
+# Remaining Budget (Row 12, I12)
+# If first week:
+=I2-H11
+# If subsequent week:
+=[Previous Remaining Cell]-H11
+```
+
+### UI Components Needed
+
+1. **Create Master Section**
+   - Semester name input (text)
+   - Starting budget input (currency)
+   - Meeting date picker (default: next Sunday)
+   - "Create Master Spreadsheet" button
+
+2. **Merge to Master Section**
+   - Master file upload (.xlsx only)
+   - Pending CSV upload
+   - Meeting date picker (optional override)
+   - "Merge & Download" button
+
+---
+
 ## Future Considerations
 
 ### Data Persistence
@@ -533,3 +707,12 @@ npm run dev
 
 *Last Updated: January 9, 2026*
 *Author: Luke Brevoort, VP of Finance*
+
+---
+
+## Revision History
+
+| Date | Version | Changes |
+|------|---------|---------|
+| 2026-01-09 | 1.0 | Initial plan created |
+| 2026-01-09 | 1.1 | Added Phase 2: Master Spreadsheet Management specification |
