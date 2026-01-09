@@ -9,13 +9,18 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "next": "16.1.1",
+    "papaparse": "^5.5.3",
+    "pptxgenjs": "^4.0.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "react-dropzone": "^14.3.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
