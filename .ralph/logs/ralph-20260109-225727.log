@@ -1,0 +1,117 @@
+=== Iteration 1 - Fri Jan  9 22:57:27 MST 2026 ===
+# Ralph Loop Context
+
+**Iteration**: 1 / 5
+**Mode**: Autonomous iterative development
+
+---
+
+# Task
+
+Find and read the main page file (src/app/page.tsx), then create a file called DARK_MODE_ANALYSIS.md listing what components need dark mode styling. Output <promise>DONE</promise> when complete.
+
+--- Output ---
+Luke's Hybrid Plugin loaded!
+[91m[1m| [0m[90m Bash     [0mCheck for page.tsx in likely locations
+
+src/app:
+api
+favicon.ico
+globals.css
+layout.tsx
+page.tsx
+
+src/app/api:
+create-master
+generate-pptx
+generate-xlsx
+merge-spreadsheet
+parse-csv
+
+src/app/api/create-master:
+route.ts
+
+src/app/api/generate-pptx:
+route.ts
+
+src/app/api/generate-xlsx:
+route.ts
+
+src/app/api/merge-spreadsheet:
+route.ts
+
+src/app/api/parse-csv:
+route.ts
+
+[96m[1m| [0m[90m Read     [0msrc/app/page.tsx
+thought:The user wants to find and read `src/app/page.tsx` (which I just did) and then create `DARK_MODE_ANALYSIS.md` listing components that need dark mode styling.
+
+I have the content of `src/app/page.tsx`. I need to analyze it for hardcoded colors, light-mode specific classes (like `bg-white`, `text-gray-900`, `bg-blue-50`, etc.), and lack of `dark:` variants.
+
+**Analysis of `src/app/page.tsx`:**
+
+1.  **Global Backgrounds/Text:**
+    *   `text-gray-600` (Lines 72, 88, 138, 208)
+    *   `text-gray-900` (Lines 87, 98, 126, 205)
+    *   `bg-white` (Lines 78, 215, 222) - Needs `dark:bg-gray-800` or similar.
+    *   `text-[#A32638]` (Line 69) - This is the primary brand color. Might need adjustment or stay as is, but background contrast matters.
+
+2.  **Section 1: Senate Presentations:**
+    *   `bg-white rounded-xl shadow-md` (Line 78) - Main container.
+    *   `border-t-[#A32638]` (Line 78) - Border color.
+    *   `bg-gray-50/50` (Line 79) - Header background. Needs `dark:bg-gray-900` or similar.
+    *   `border-gray-100` (Line 79) - Border.
+    *   `bg-[#A32638] text-white` (Line 81) - Icon container. Usually okay, but check contrast.
+    *   Text colors: `text-gray-900` (Line 87), `text-gray-600` (Line 88).
+
+3.  **Upload Area (Step 1):**
+    *   `text-gray-500` (Lines 97, 99).
+    *   `text-gray-900` (Line 98).
+    *   `FileUpload` component - Will need to check this component internally, but the props passed here don't show styling. I should note that sub-components need checking.
+    *   Error state: `bg-red-50 border-red-200` (Line 108), `text-red-500` (Line 110), `text-red-800` (Line 114), `text-red-700` (Line 115). Needs dark mode variants (e.g., `dark:bg-red-900/20`, `dark:border-red-900`).
+
+4.  **Ready to Generate State:**
+    *   `border-gray-100` (Line 124).
+    *   `text-gray-900` (Line 126).
+    *   `text-green-600` (Line 129).
+    *   Reset button: `text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200` (Lines 138-139). Needs dark mode (e.g., `dark:bg-gray-800 dark:text-gray-300`).
+
+5.  **Warnings:**
+    *   `bg-yellow-50 border-yellow-200` (Line 150).
+    *   `text-yellow-500` (Line 152), `text-yellow-800` (Line 156), `text-yellow-700` (Line 157). Needs dark mode.
+
+6.  **Preview Table Container:**
+    *   `bg-gray-50 border-gray-200` (Line 168).
+    *   Header: `border-gray-200 bg-gray-100/50` (Line 169).
+    *   `text-gray-700` (Line 170).
+    *   `CSVPreview` component needs internal checking.
+
+7.  **Download Actions:**
+    *   `text-gray-500` (Line 184).
+
+8.  **Section 2: Sunday Meeting:**
+    *   Separator: `bg-gray-300` (Line 194), `text-gray-400` (Line 195).
+    *   Icon: `bg-blue-50 text-blue-700` (Line 200).
+    *   `text-gray-900` (Line 205), `text-gray-600` (Line 208).
+    *   Cards: `bg-white border-gray-200` (Lines 215, 222).
+    *   `MergeMasterForm` and `CreateMasterForm` components need checking.
+
+9.  **Master Spreadsheet Tips:**
+    *   `bg-blue-50 border-blue-100` (Line 230).
+    *   `text-blue-900` (Lines 231, 239, 245, 251).
+    *   `text-blue-800` (Line 237).
+    *   `text-blue-700/90` (Lines 240, 246, 252).
+
+**Plan:**
+1.  Create `DARK_MODE_ANALYSIS.md` with the findings above.
+2.  Output `<promise>DONE</promise>`.
+
+I will list the specific elements in `page.tsx` and also note the imported components that likely need updates (`FileUpload`, `CSVPreview`, `DownloadButton`, `CreateMasterForm`, `MergeMasterForm`).
+[92m[1m| [0m[90m Write    [0mDARK_MODE_ANALYSIS.md
+[91m[1m| [0m[90m Bash     [0mSignal completion of the analysis task
+
+DONE
+
+DONE
+Luke's Hybrid Plugin loaded!
+

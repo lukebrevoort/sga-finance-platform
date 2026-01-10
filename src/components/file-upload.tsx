@@ -55,9 +55,9 @@ export function FileUpload({ onFileAccepted, isProcessing = false }: FileUploadP
   });
 
   const stateStyles = {
-    idle: 'border-gray-300 bg-gray-50 hover:border-[#A32638] hover:bg-red-50',
-    dragging: 'border-[#A32638] bg-red-50 scale-[1.02]',
-    processing: 'border-[#A32638] bg-red-50 opacity-75',
+    idle: 'border-gray-300 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800 hover:border-[#A32638] dark:hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/10',
+    dragging: 'border-[#A32638] dark:border-red-500 bg-red-50 dark:bg-red-900/10 scale-[1.02]',
+    processing: 'border-[#A32638] dark:border-red-500 bg-red-50 dark:bg-red-900/10 opacity-75',
   };
 
   return (
@@ -79,7 +79,7 @@ export function FileUpload({ onFileAccepted, isProcessing = false }: FileUploadP
         <div className={`mb-4 transition-transform duration-200 ${isDragActive ? 'scale-110' : ''}`}>
           {uploadState === 'processing' ? (
             <svg
-              className="w-12 h-12 text-[#A32638] animate-spin"
+              className="w-12 h-12 text-[#A32638] dark:text-red-500 animate-spin"
               fill="none"
               viewBox="0 0 24 24"
             >
@@ -99,7 +99,7 @@ export function FileUpload({ onFileAccepted, isProcessing = false }: FileUploadP
             </svg>
           ) : (
             <svg
-              className={`w-12 h-12 ${isDragActive ? 'text-[#A32638]' : 'text-gray-400'}`}
+              className={`w-12 h-12 ${isDragActive ? 'text-[#A32638] dark:text-red-500' : 'text-gray-400 dark:text-gray-500'}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -117,16 +117,16 @@ export function FileUpload({ onFileAccepted, isProcessing = false }: FileUploadP
         {/* Text Content */}
         <div className="text-center">
           {uploadState === 'processing' ? (
-            <p className="text-sm font-medium text-[#A32638]">Processing file...</p>
+            <p className="text-sm font-medium text-[#A32638] dark:text-red-400">Processing file...</p>
           ) : isDragActive ? (
-            <p className="text-sm font-medium text-[#A32638]">Drop the CSV file here</p>
+            <p className="text-sm font-medium text-[#A32638] dark:text-red-400">Drop the CSV file here</p>
           ) : (
             <>
-              <p className="text-sm font-medium text-gray-700">
-                <span className="text-[#A32638] hover:underline">Click to upload</span> or drag and
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                <span className="text-[#A32638] dark:text-red-400 hover:underline">Click to upload</span> or drag and
                 drop
               </p>
-              <p className="mt-1 text-xs text-gray-500">CSV files only (exported from CampusGroups)</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">CSV files only (exported from CampusGroups)</p>
             </>
           )}
         </div>
@@ -134,8 +134,8 @@ export function FileUpload({ onFileAccepted, isProcessing = false }: FileUploadP
 
       {/* Error Message */}
       {error && (
-        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600 flex items-center gap-2">
+        <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+          <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path
                 fillRule="evenodd"

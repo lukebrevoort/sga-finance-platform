@@ -1,0 +1,100 @@
+=== Iteration 1 - Fri Jan  9 22:57:58 MST 2026 ===
+# Ralph Loop Context
+
+**Iteration**: 1 / 10
+**Mode**: Autonomous iterative development
+
+---
+
+# Task
+
+
+Improve dark mode contrast and surfaces across the main page.
+Scope:
+- Only modify styling (Tailwind classes and/or src/app/globals.css).
+- Focus on src/app/page.tsx and shared components in src/components if needed.
+Requirements:
+1) In dark mode, ensure all text has readable contrast (no dark text on dark backgrounds).
+2) Add appropriate dark backgrounds/borders for panels, cards, inputs, and buttons used on the home page.
+3) Do not change business logic.
+4) After changes, run: npm run lint and npm run build and ensure they pass.
+When all requirements are met, output <promise>COMPLETE</promise> and include a short summary of what you changed.
+
+--- Output ---
+Luke's Hybrid Plugin loaded!
+[91m[1m| [0m[90m Bash     [0mList files in src/app and src/components to understand structure
+
+src/app:
+api
+favicon.ico
+globals.css
+layout.tsx
+page.tsx
+
+src/app/api:
+create-master
+generate-pptx
+generate-xlsx
+merge-spreadsheet
+parse-csv
+
+src/app/api/create-master:
+route.ts
+
+src/app/api/generate-pptx:
+route.ts
+
+src/app/api/generate-xlsx:
+route.ts
+
+src/app/api/merge-spreadsheet:
+route.ts
+
+src/app/api/parse-csv:
+route.ts
+
+src/components:
+create-master-form.tsx
+csv-preview.tsx
+download-button.tsx
+file-upload.tsx
+merge-master-form.tsx
+status-badge.tsx
+
+[96m[1m| [0m[90m Read     [0msrc/app/globals.css
+[96m[1m| [0m[90m Read     [0msrc/app/page.tsx
+[91m[1m| [0m[90m Bash     [0mFind components using white background to identify candidates for dark mode updates
+
+src/components/create-master-form.tsx
+src/components/csv-preview.tsx
+src/components/merge-master-form.tsx
+
+[96m[1m| [0m[90m Read     [0msrc/components/create-master-form.tsx
+[96m[1m| [0m[90m Read     [0msrc/components/merge-master-form.tsx
+[96m[1m| [0m[90m Read     [0msrc/components/csv-preview.tsx
+[94m[1m| [0m[90m task     [0mChecking if the project compiles and passes linting checks.
+[91m[1m| [0m[90m Bash     [0mCheck other components for bg-white usage
+[96m[1m| [0m[90m Read     [0msrc/components/file-upload.tsx
+[92m[1m| [0m[90m Edit     [0msrc/app/page.tsx
+[92m[1m| [0m[90m Edit     [0msrc/components/file-upload.tsx
+[92m[1m| [0m[90m Edit     [0msrc/components/create-master-form.tsx
+[92m[1m| [0m[90m Edit     [0msrc/components/merge-master-form.tsx
+[92m[1m| [0m[90m Edit     [0msrc/components/csv-preview.tsx
+[94m[1m| [0m[90m task     [0mFinal verification after styling changes
+COMPLETE
+
+Summary of changes:
+1. Updated `src/app/page.tsx` to include dark mode support using Tailwind's `dark:` classes.
+   - Added dark background colors (`dark:bg-[#0a0a0a]`, `dark:bg-neutral-900`) and border adjustments.
+   - Updated text colors to ensure high contrast in dark mode (`dark:text-white`, `dark:text-gray-400`, `dark:text-gray-300`).
+   - Styled section backgrounds and card containers to be visually distinct in dark mode.
+
+2. Updated `src/components/file-upload.tsx`, `src/components/create-master-form.tsx`, `src/components/merge-master-form.tsx`, and `src/components/csv-preview.tsx` to fully support dark mode.
+   - Ensured input fields, dropzones, and tables have appropriate dark backgrounds and readable text.
+   - Adjusted border colors and hover states for better visibility.
+   - Added dark mode variants for status badges and warning/success messages.
+
+3. Verified changes:
+   - Ran `npm run lint && npm run build` successfully, confirming no new errors were introduced.
+Luke's Hybrid Plugin loaded!
+
