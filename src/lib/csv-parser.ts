@@ -131,18 +131,21 @@ function normalizeFinanceRoute(value: string | undefined | null): BudgetRequest[
 
 /**
  * Normalize request type to expected values
+ * Handles common typos like "rellocation" for "reallocation"
  */
 function normalizeRequestType(value: string | undefined | null): BudgetRequest['requestType'] {
   if (!value || typeof value !== 'string') {
     return 'AFR';
   }
-  
+
   const normalized = value.trim().toLowerCase();
-  
-  if (normalized.includes('reallocation')) {
+
+  // Check for reallocation (including common typo "rellocation")
+  // Also handles variations like "re-allocation", "re allocation"
+  if (normalized.includes('realloc') || normalized.includes('re alloc')) {
     return 'Reallocation';
   }
-  
+
   // Default to AFR (Additional Funding Request)
   return 'AFR';
 }
