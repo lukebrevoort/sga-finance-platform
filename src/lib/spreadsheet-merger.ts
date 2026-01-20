@@ -40,16 +40,22 @@ const AFR_COLUMNS = [
 ];
 
 /**
- * Reallocation sheet columns - simpler format
- * A: Date
- * B: Organization
- * C: Requested Amount
- * D: Account Number
+ * Reallocation sheet columns - matches master spreadsheet format
+ * A: Date of Meeting
+ * B: Notes
+ * C: Organization
+ * D: Requested Amount
+ * E: Approved Amount
+ * F: Status
+ * G: Account Number
  */
 const REALLOCATION_COLUMNS = [
-  { header: 'Date', key: 'date', width: 15 },
+  { header: 'Date of Meeting', key: 'dateOfMeeting', width: 15 },
+  { header: '', key: 'notes', width: 10 }, // Notes column (B)
   { header: 'Organization', key: 'organization', width: 30 },
-  { header: 'Requested Amount', key: 'amount', width: 18 },
+  { header: 'Requested Amount', key: 'requestedAmount', width: 18 },
+  { header: 'Approved Amount', key: 'approvedAmount', width: 18 },
+  { header: 'Status', key: 'status', width: 12 },
   { header: 'Account Number', key: 'accountNumber', width: 18 },
 ];
 
@@ -164,12 +170,15 @@ function applyAFRCurrencyFormat(worksheet: ExcelJS.Worksheet): void {
 }
 
 /**
- * Apply currency formatting to Reallocation amount column
+ * Apply currency formatting to Reallocation amount columns
  */
 function applyReallocationCurrencyFormat(worksheet: ExcelJS.Worksheet): void {
-  // Column C is the amount column (1-indexed: 3)
-  const column = worksheet.getColumn(3);
-  column.numFmt = '"$"#,##0.00';
+  // Columns D and E are currency columns (1-indexed: 4, 5)
+  const currencyColumns = [4, 5];
+  currencyColumns.forEach((colNum) => {
+    const column = worksheet.getColumn(colNum);
+    column.numFmt = '"$"#,##0.00';
+  });
 }
 
 /**
@@ -315,7 +324,8 @@ function addWeeklySubtotalRows(
 }
 
 /**
- * Add Reallocation requests to the worksheet (simple append, no formulas)
+ * Add Reallocation requests to the worksheet with proper column structure
+ * Adds Status dropdown for Approved/Denied selection
  */
 function addReallocationRequests(
   worksheet: ExcelJS.Worksheet,
@@ -324,17 +334,31 @@ function addReallocationRequests(
 ): void {
   requests.forEach((request, index) => {
     const displayName = request.displayName || request.organizationName;
-    
+    const rowNumber = worksheet.lastRow ? worksheet.lastRow.number + 1 : 1;
+
     // Only show date on first row of this week's data
     const dateValue = index === 0 ? (meetingDate || '') : '';
-    
+
     const row = worksheet.addRow([
-      dateValue, // A: Date
-      displayName, // B: Organization
-      request.amount, // C: Requested Amount
-      request.accountNumber, // D: Account Number
+      dateValue, // A: Date of Meeting
+      '', // B: Notes column - left blank
+      displayName, // C: Organization
+      request.amount, // D: Requested Amount
+      null, // E: Approved Amount - left blank for manual entry
+      '', // F: Status - left blank for manual entry (dropdown)
+      request.accountNumber, // G: Account Number
     ]);
     styleDataRow(row);
+
+    // Add data validation for Status column (F) - dropdown with Approved/Denied
+    row.getCell(6).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['"Approved,Denied"'],
+      showErrorMessage: true,
+      errorTitle: 'Invalid Status',
+      error: 'Please select either Approved or Denied',
+    };
   });
 }
 
