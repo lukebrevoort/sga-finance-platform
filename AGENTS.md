@@ -15,10 +15,9 @@ This is the **SGA Finance Platform** for Stevens Institute of Technology's Stude
 ## Quick Context
 
 ### What This App Does
-- Users upload CSV exports from CampusGroups (the university's budgeting system)
-- System auto-detects if CSV contains approved or pending requests
-- Generates formatted .pptx or .xlsx files for download
-- Can merge new pending requests into an existing master spreadsheet
+- **Spreadsheet Generation**: Users upload CSV exports from CampusGroups containing ALL budget requests (Pending, Auto-Approved, Budget Review approved). The system generates formatted .xlsx files for Sunday meeting reviews, with pre-approved items already marked.
+- **Slideshow Generation**: After the Sunday meeting, users upload the completed weekly spreadsheet (.xlsx) and select which week to generate a PowerPoint presentation for Senate.
+- Can merge new requests into an existing master spreadsheet
 
 ### Who Uses This
 - SGA Finance Team members
@@ -27,6 +26,11 @@ This is the **SGA Finance Platform** for Stevens Institute of Technology's Stude
 
 ### Key Constraint
 - CampusGroups API is not available - all data comes via manual CSV export
+
+### Current Workflow (as of Feb 2026)
+1. **Before Meeting**: Export all pending/approved requests from CampusGroups → Upload CSV → Get weekly spreadsheet
+2. **During Meeting**: Review requests in spreadsheet, mark Approved/Denied, fill in final amounts
+3. **After Meeting**: Upload completed spreadsheet → Select week → Generate PPTX for Senate
 
 ---
 
@@ -43,7 +47,8 @@ This is the **SGA Finance Platform** for Stevens Institute of Technology's Stude
 │  │  - File Upload   │───▶│  POST /api/generate-xlsx   │ │
 │  │  - Preview       │    │  POST /api/merge-spreadsheet│ │
 │  │  - Download      │◀───│  POST /api/parse-csv       │ │
-│  │                  │    │                            │ │
+│  │                  │    │  POST /api/parse-spreadsheet│ │
+│  │                  │    │  POST /api/generate-pptx-from-xlsx │
 │  └──────────────────┘    └────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -277,7 +282,7 @@ The CampusGroups CSV has verbose column names. Map them as follows:
 ### `POST /api/generate-pptx`
 **Input**: `{ requests: BudgetRequest[] }`  
 **Output**: Binary .pptx file  
-**Purpose**: Generate PowerPoint slideshow
+**Purpose**: Generate PowerPoint slideshow (legacy - from BudgetRequest array)
 
 ### `POST /api/generate-xlsx`
 **Input**: `{ requests: BudgetRequest[] }`  
@@ -288,6 +293,16 @@ The CampusGroups CSV has verbose column names. Map them as follows:
 **Input**: FormData with master .xlsx + new CSV  
 **Output**: Binary .xlsx file (merged)  
 **Purpose**: Append new requests to existing master
+
+### `POST /api/parse-spreadsheet`
+**Input**: FormData with .xlsx file  
+**Output**: `{ weeks: ParsedWeek[] }` with dates and request data  
+**Purpose**: Parse weekly spreadsheet and identify week boundaries
+
+### `POST /api/generate-pptx-from-xlsx`
+**Input**: FormData with .xlsx file + weekDate: string  
+**Output**: Binary .pptx file  
+**Purpose**: Generate PPTX for a specific week from weekly spreadsheet
 
 ---
 
@@ -434,6 +449,7 @@ None required for MVP. If added later:
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-09 | Initial AGENTS.md created | Luke Brevoort |
+| 2026-02-03 | Updated workflow: CSV now accepts all request types (pre-fills approved); PPTX generated from weekly spreadsheet with week selection | Luke Brevoort |
 
 ---
 

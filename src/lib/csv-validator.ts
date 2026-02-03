@@ -67,16 +67,18 @@ export function validateCSV(requests: BudgetRequest[]): ValidationResult {
     // All pending
     type = 'pending';
   } else if (approvedCount > 0 && pendingCount > 0) {
-    // Mixed approved and pending
-    type = 'mixed';
-    errors.push(
-      `CSV contains both approved (${approvedCount}) and pending (${pendingCount}) requests. ` +
-      `Please separate approved and pending requests into different files.`
-    );
+    // Mixed approved and pending - this is now the 'all' type for spreadsheet generation
+    type = 'all';
+    // No longer an error - this is expected for spreadsheet generation
+    if (deniedCount > 0) {
+      warnings.push(
+        `CSV contains ${deniedCount} denied request(s). These will be excluded from generation.`
+      );
+    }
   } else if (deniedCount > 0) {
     // Has denied requests
     if (approvedCount > 0 || pendingCount > 0) {
-      type = 'mixed';
+      type = approvedCount > 0 ? 'approved' : 'pending';
       warnings.push(
         `CSV contains ${deniedCount} denied request(s). ` +
         `These will be excluded from generation.`
@@ -92,7 +94,7 @@ export function validateCSV(requests: BudgetRequest[]): ValidationResult {
   }
   
   // For pending requests, check if any are not "Sunday Meeting" finance route
-  if (type === 'pending' || (pendingCount > 0 && type !== 'unknown')) {
+  if (type === 'pending' || type === 'all' || (pendingCount > 0 && type !== 'unknown')) {
     const pendingRequests = requests.filter(r => r.approvalStatus === 'Pending Approval');
     const nonSundayMeeting = pendingRequests.filter(r => r.financeRoute !== 'Sunday Meeting');
     
@@ -143,6 +145,113 @@ export function validateCSV(requests: BudgetRequest[]): ValidationResult {
     type,
     warnings,
     errors,
+  };
+}
+
+/**
+ * Validate CSV for spreadsheet generation (accepts all request types)
+ * Filters out denied requests and "Finance Review" late submissions
+ * 
+ * @param requests - Array of parsed BudgetRequest objects
+ * @returns ValidationResult with type 'all', warnings, and errors
+ */
+export function validateCSVForSpreadsheet(requests: BudgetRequest[]): ValidationResult & { 
+  filteredRequests: BudgetRequest[];
+  excludedCount: { denied: number; financeReview: number };
+} {
+  const warnings: string[] = [];
+  const errors: string[] = [];
+  
+  // Handle empty requests
+  if (!requests || requests.length === 0) {
+    return {
+      type: 'unknown',
+      warnings: [],
+      errors: ['No budget requests to validate'],
+      filteredRequests: [],
+      excludedCount: { denied: 0, financeReview: 0 },
+    };
+  }
+  
+  // Filter out denied requests and "Finance Review" route (late submissions)
+  const deniedRequests = requests.filter(r => r.approvalStatus === 'Denied');
+  const financeReviewRequests = requests.filter(r => 
+    r.rawFinanceRoute === 'Finance Review' || r.financeRoute === 'Finance Review' as any
+  );
+  
+  const filteredRequests = requests.filter(r => 
+    r.approvalStatus !== 'Denied' && 
+    r.rawFinanceRoute !== 'Finance Review' &&
+    r.financeRoute !== 'Finance Review' as any
+  );
+  
+  // Add warnings about excluded requests
+  if (deniedRequests.length > 0) {
+    warnings.push(
+      `${deniedRequests.length} denied request(s) were excluded from the spreadsheet.`
+    );
+  }
+  
+  if (financeReviewRequests.length > 0) {
+    warnings.push(
+      `${financeReviewRequests.length} late submission(s) (Finance Review route) were excluded from the spreadsheet.`
+    );
+  }
+  
+  if (filteredRequests.length === 0) {
+    errors.push('No valid requests remaining after filtering out denied and late submissions.');
+    return {
+      type: 'unknown',
+      warnings,
+      errors,
+      filteredRequests: [],
+      excludedCount: { denied: deniedRequests.length, financeReview: financeReviewRequests.length },
+    };
+  }
+  
+  // Mark pre-approved requests
+  for (const request of filteredRequests) {
+    if (request.approvalStatus === 'Approved' && 
+        (request.financeRoute === 'Auto-Approve' || request.financeRoute === 'Budget Review')) {
+      request.isPreApproved = true;
+    }
+  }
+  
+  // Count types for summary
+  const approvedCount = filteredRequests.filter(r => r.approvalStatus === 'Approved').length;
+  const pendingCount = filteredRequests.filter(r => r.approvalStatus === 'Pending Approval').length;
+  const preApprovedCount = filteredRequests.filter(r => r.isPreApproved).length;
+  
+  // Add summary info
+  if (preApprovedCount > 0) {
+    warnings.push(
+      `${preApprovedCount} pre-approved request(s) (Auto-Approve/Budget Review) will be added with "Approved" status pre-filled.`
+    );
+  }
+  
+  // Validate individual requests
+  for (let i = 0; i < filteredRequests.length; i++) {
+    const request = filteredRequests[i];
+    
+    if (request.amount === 0) {
+      warnings.push(
+        `Request ${i + 1} (${request.organizationName}): Amount is $0 or missing.`
+      );
+    }
+    
+    if (!request.accountNumber || request.accountNumber.trim() === '' || request.accountNumber === '#') {
+      warnings.push(
+        `Request ${i + 1} (${request.organizationName}): Account number is missing or invalid.`
+      );
+    }
+  }
+  
+  return {
+    type: approvedCount > 0 && pendingCount > 0 ? 'all' : (approvedCount > 0 ? 'approved' : 'pending'),
+    warnings,
+    errors,
+    filteredRequests,
+    excludedCount: { denied: deniedRequests.length, financeReview: financeReviewRequests.length },
   };
 }
 

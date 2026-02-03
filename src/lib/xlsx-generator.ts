@@ -114,6 +114,22 @@ function applyReallocationCurrencyFormat(worksheet: ExcelJS.Worksheet): void {
 }
 
 /**
+ * Build the Notes column value for a request
+ * - For pre-approved: "[Finance Route]: [Description]"
+ * - For pending: Just the description
+ */
+function buildNotesValue(request: BudgetRequest): string {
+  if (request.isPreApproved) {
+    // Include finance route prefix for pre-approved requests
+    const route = request.financeRoute || 'Pre-Approved';
+    const desc = request.description?.trim() || '';
+    return desc ? `${route}: ${desc}` : route;
+  }
+  // For pending Sunday Meeting requests, just include the description
+  return request.description?.trim() || '';
+}
+
+/**
  * Add a section header row
  */
 function addSectionHeader(
@@ -166,19 +182,29 @@ function addReallocationColumnHeaders(worksheet: ExcelJS.Worksheet): ExcelJS.Row
 
 /**
  * Convert an AFR BudgetRequest to a spreadsheet row
+ * For pre-approved requests: Status="Approved", After Amendments=amount, Notes="[Route]: [Desc]"
+ * For pending requests: Status blank, After Amendments blank, Notes=description
  */
 function afrRequestToRow(request: BudgetRequest): (string | number | undefined)[] {
   const displayName = request.displayName || request.organizationName;
+  const isPreApproved = request.isPreApproved === true;
+  
+  // Build notes value
+  const notesValue = buildNotesValue(request);
+  
+  // For pre-approved: set Status to "Approved" and After Amendments to the amount
+  const statusValue = isPreApproved ? 'Approved' : '';
+  const afterAmendmentsValue = isPreApproved ? request.amount : undefined;
 
   return [
     '', // Date of Meeting - left blank
-    '', // Notes column - left blank
+    notesValue, // Notes column - description (with route prefix for pre-approved)
     displayName, // Organization
     request.amount, // AFR'd / Requested Amount
-    undefined, // Amended - left blank
-    undefined, // After Amendments - left blank
-    '', // Status - left blank for dropdown
-    undefined, // Final Amount - left blank
+    undefined, // Amended - calculated by formula
+    afterAmendmentsValue, // After Amendments - pre-filled for approved, blank for pending
+    statusValue, // Status - "Approved" for pre-approved, blank for pending
+    undefined, // Final Amount - calculated by formula
     displayName, // Name of Org (same as Organization)
     '', // Entered in KFS? - left blank
     request.accountNumber, // Account Number
@@ -187,17 +213,27 @@ function afrRequestToRow(request: BudgetRequest): (string | number | undefined)[
 
 /**
  * Convert a Reallocation BudgetRequest to a spreadsheet row
+ * For pre-approved requests: Status="Approved", Approved Amount=amount, Notes="[Route]: [Desc]"
+ * For pending requests: Status blank, Approved Amount blank, Notes=description
  */
 function reallocationRequestToRow(request: BudgetRequest): (string | number | undefined)[] {
   const displayName = request.displayName || request.organizationName;
+  const isPreApproved = request.isPreApproved === true;
+  
+  // Build notes value
+  const notesValue = buildNotesValue(request);
+  
+  // For pre-approved: set Status to "Approved" and Approved Amount to the amount
+  const statusValue = isPreApproved ? 'Approved' : '';
+  const approvedAmountValue = isPreApproved ? request.amount : undefined;
 
   return [
     '', // Date of Meeting - left blank
-    '', // Notes column - left blank
+    notesValue, // Notes column - description (with route prefix for pre-approved)
     displayName, // Organization
     request.amount, // Requested Amount
-    undefined, // Approved Amount - left blank
-    '', // Status - left blank for dropdown
+    approvedAmountValue, // Approved Amount - pre-filled for approved, blank for pending
+    statusValue, // Status - "Approved" for pre-approved, blank for pending
     request.accountNumber, // Account Number
   ];
 }

@@ -233,8 +233,30 @@ function addReallocationColumnHeaders(worksheet: ExcelJS.Worksheet): ExcelJS.Row
 }
 
 /**
+ * Build the Notes column value for a request
+ * - For pre-approved: "[Finance Route]: [Description]"
+ * - For pending: Just the description
+ */
+function buildNotesValue(request: BudgetRequest): string {
+  if (request.isPreApproved) {
+    // Include finance route prefix for pre-approved requests
+    const route = request.financeRoute || 'Pre-Approved';
+    const desc = request.description?.trim() || '';
+    return desc ? `${route}: ${desc}` : route;
+  }
+  // For pending Sunday Meeting requests, just include the description
+  return request.description?.trim() || '';
+}
+
+/**
  * Add AFR requests to the worksheet with proper formulas
  * Returns the row numbers of the first and last data rows
+ * 
+ * For pre-approved requests (Auto-Approve or Budget Review):
+ * - Status is set to "Approved"
+ * - After Amendments is set to the request amount
+ * - Final Amount formula will calculate based on Status
+ * - Notes column contains "[Finance Route]: [Description]"
  */
 function addAFRRequests(
   worksheet: ExcelJS.Worksheet,
@@ -250,14 +272,25 @@ function addAFRRequests(
     // Only show date on first row of this week's data
     const dateValue = index === 0 ? (meetingDate || '') : '';
     
+    // Determine if this is a pre-approved request
+    const isPreApproved = request.isPreApproved === true;
+    
+    // For pre-approved: set Status to "Approved" and After Amendments to the amount
+    // For pending: leave Status blank and After Amendments blank
+    const statusValue = isPreApproved ? 'Approved' : '';
+    const afterAmendmentsValue = isPreApproved ? request.amount : null;
+    
+    // Build the Notes column value
+    const notesValue = buildNotesValue(request);
+    
     const row = worksheet.addRow([
       dateValue, // A: Date of Meeting
-      '', // B: Notes column - left blank
+      notesValue, // B: Notes column - description (with route prefix for pre-approved)
       displayName, // C: Organization
       request.amount, // D: AFR'd / Requested Amount
       { formula: `D${rowNumber}-F${rowNumber}` }, // E: Amended = AFR'd - After Amendments
-      null, // F: After Amendments - left blank for manual entry
-      '', // G: Status - left blank for manual entry (dropdown)
+      afterAmendmentsValue, // F: After Amendments - pre-filled for approved, blank for pending
+      statusValue, // G: Status - "Approved" for pre-approved, blank for pending
       { formula: `IF(G${rowNumber}="Approved",F${rowNumber},0)` }, // H: Final Amount
       null, // I: Remaining Budget - only on subtotal rows
       displayName, // J: Name of Org (same as Organization)
@@ -326,6 +359,11 @@ function addWeeklySubtotalRows(
 /**
  * Add Reallocation requests to the worksheet with proper column structure
  * Adds Status dropdown for Approved/Denied selection
+ * 
+ * For pre-approved requests (Auto-Approve or Budget Review):
+ * - Status is set to "Approved"
+ * - Approved Amount is set to the request amount
+ * - Notes column contains "[Finance Route]: [Description]"
  */
 function addReallocationRequests(
   worksheet: ExcelJS.Worksheet,
@@ -338,14 +376,25 @@ function addReallocationRequests(
 
     // Only show date on first row of this week's data
     const dateValue = index === 0 ? (meetingDate || '') : '';
+    
+    // Determine if this is a pre-approved request
+    const isPreApproved = request.isPreApproved === true;
+    
+    // For pre-approved: set Status to "Approved" and Approved Amount to the request amount
+    // For pending: leave Status blank and Approved Amount blank
+    const statusValue = isPreApproved ? 'Approved' : '';
+    const approvedAmountValue = isPreApproved ? request.amount : null;
+    
+    // Build the Notes column value
+    const notesValue = buildNotesValue(request);
 
     const row = worksheet.addRow([
       dateValue, // A: Date of Meeting
-      '', // B: Notes column - left blank
+      notesValue, // B: Notes column - description (with route prefix for pre-approved)
       displayName, // C: Organization
       request.amount, // D: Requested Amount
-      null, // E: Approved Amount - left blank for manual entry
-      '', // F: Status - left blank for manual entry (dropdown)
+      approvedAmountValue, // E: Approved Amount - pre-filled for approved, blank for pending
+      statusValue, // F: Status - "Approved" for pre-approved, blank for pending
       request.accountNumber, // G: Account Number
     ]);
     styleDataRow(row);
@@ -423,6 +472,24 @@ export async function mergeSpreadsheet(
   // Separate new requests by type
   const newAfrRequests = newRequests.filter((r) => r.requestType === 'AFR');
   const newReallocationRequests = newRequests.filter((r) => r.requestType === 'Reallocation');
+  
+  // Sort requests: pre-approved (Auto-Approve, Budget Review) first, then pending (Sunday Meeting)
+  // This makes it easier to review - approved items at top, items needing decisions below
+  const sortByApprovalStatus = (a: BudgetRequest, b: BudgetRequest): number => {
+    // Pre-approved items come first
+    const aIsPreApproved = a.isPreApproved === true;
+    const bIsPreApproved = b.isPreApproved === true;
+    
+    if (aIsPreApproved && !bIsPreApproved) return -1;
+    if (!aIsPreApproved && bIsPreApproved) return 1;
+    
+    // Within same category, sort by organization name for consistency
+    return a.organizationName.localeCompare(b.organizationName);
+  };
+  
+  // Apply sorting to both request types
+  newAfrRequests.sort(sortByApprovalStatus);
+  newReallocationRequests.sort(sortByApprovalStatus);
   
   if (masterBuffer) {
     // Load existing workbook
@@ -511,6 +578,16 @@ export async function mergeSpreadsheet(
     
     // Add new Reallocation requests if any
     if (newReallocationRequests.length > 0 && reallocationWorksheet) {
+      // Add a blank row separator if there's existing data
+      const reallocationLastRow = reallocationWorksheet.lastRow?.number || 0;
+      
+      if (reallocationLastRow > 0) {
+        reallocationWorksheet.addRow([]);
+      }
+      
+      // Add section header for the week (matching AFR format for xlsx-parser)
+      addSectionHeader(reallocationWorksheet, `Week of ${formattedMeetingDate || 'Pending'}`, REALLOCATION_COLUMNS.length);
+      
       addReallocationRequests(reallocationWorksheet, newReallocationRequests, formattedMeetingDate);
       applyReallocationCurrencyFormat(reallocationWorksheet);
     }
@@ -590,6 +667,8 @@ export async function mergeSpreadsheet(
         key: col.key,
       }));
       
+      // Add section header for the week (matching AFR format for xlsx-parser)
+      addSectionHeader(reallocationWorksheet, `Week of ${formattedMeetingDate || 'Pending'}`, REALLOCATION_COLUMNS.length);
       addReallocationColumnHeaders(reallocationWorksheet);
       addReallocationRequests(reallocationWorksheet, newReallocationRequests, formattedMeetingDate);
       applyReallocationCurrencyFormat(reallocationWorksheet);

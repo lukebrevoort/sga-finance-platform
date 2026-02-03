@@ -140,9 +140,9 @@ function normalizeRequestType(value: string | undefined | null): BudgetRequest['
 
   const normalized = value.trim().toLowerCase();
 
-  // Check for reallocation (including common typo "rellocation")
+  // Check for reallocation (including common typos like "rellocation")
   // Also handles variations like "re-allocation", "re allocation"
-  if (normalized.includes('realloc') || normalized.includes('re alloc')) {
+  if (normalized.includes('realloc') || normalized.includes('relloc') || normalized.includes('re alloc')) {
     return 'Reallocation';
   }
 

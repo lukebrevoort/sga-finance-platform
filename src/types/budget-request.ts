@@ -18,13 +18,22 @@ export interface BudgetRequest {
   description: string;
   approvalStatus: ApprovalStatus;
   financeRoute: FinanceRoute;
+  /** Raw finance route from CSV - may include "Finance Review" for late submissions */
+  rawFinanceRoute?: string;
   accountNumber: string;
   submittedOn: Date;
   submitterName: string;
   submitterEmail: string;
+  /** Flag indicating this request was pre-approved (Auto-Approve or Budget Review) */
+  isPreApproved?: boolean;
 }
 
-export type CSVType = 'approved' | 'pending' | 'mixed' | 'unknown';
+export type CSVType = 'approved' | 'pending' | 'mixed' | 'all' | 'unknown';
+
+/**
+ * Finance Review route type - includes the special case for late submissions
+ */
+export type FinanceReviewRoute = FinanceRoute | 'Finance Review';
 
 export interface CSVParseResult {
   type: CSVType;

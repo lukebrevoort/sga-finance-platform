@@ -705,8 +705,416 @@ npm run dev
 
 ---
 
-*Last Updated: January 9, 2026*
+*Last Updated: February 3, 2026*
 *Author: Luke Brevoort, VP of Finance*
+
+---
+
+## Phase 3: Post-Meeting Workflow Improvements
+
+### Overview
+
+After the first budget meeting, we identified workflow issues that require changes to how both the spreadsheet and slideshow are generated. This phase addresses two key improvements:
+
+1. **Spreadsheet Generation**: Accept ALL requests (not just Pending), with Auto-Approved/Budget Review requests pre-filled
+2. **Slideshow Generation**: Generate from the weekly spreadsheet instead of CSV, with week selection
+
+### Problem Statement
+
+**Current Issues:**
+- Spreadsheet only shows Pending requests; Auto-Approved and Budget Review approved items are missing
+- Users must manually add Auto-Approved/Budget Review items to the spreadsheet
+- Slideshow generation requires a separate CSV export of approved items
+- No way to generate a slideshow directly from the completed weekly spreadsheet
+
+**Solution:**
+- CSV upload for spreadsheet includes ALL request types (pre-fill approved items)
+- Slideshow is generated from the weekly spreadsheet after the meeting is complete
+- Week selector allows generating presentations for any past meeting
+
+---
+
+### Change 1: Enhanced Spreadsheet Generation
+
+#### Current Behavior
+```
+CSV (Pending only) → XLSX with blank Status/Final Amount
+```
+
+#### New Behavior
+```
+CSV (All Requests) → XLSX with:
+  - Pending (Sunday Meeting): Blank Status, Blank Final Amount
+  - Approved (Auto-Approve): Status="Approved", Final Amount=Amount, Notes="Auto-Approve"
+  - Approved (Budget Review): Status="Approved", Final Amount=Amount, Notes="Budget Review"
+  - Denied: EXCLUDED (from previous weeks)
+  - Finance Review route: EXCLUDED (submitted late, not reviewed)
+```
+
+#### Implementation Details
+
+##### 1. Update CSV Validator (`lib/csv-validator.ts`)
+- Remove strict "pending only" check for spreadsheet generation
+- Add new CSVType: `'all'` for mixed approved+pending scenarios
+- Add filter function to exclude:
+  - Denied requests
+  - Requests with financeRoute = "Finance Review" (late submissions)
+
+##### 2. Update Types (`types/budget-request.ts`)
+- Add `'all'` to CSVType union
+- Add optional `preApproved?: boolean` flag to BudgetRequest for tracking
+
+##### 3. Update Spreadsheet Merger (`lib/spreadsheet-merger.ts`)
+- Modify `addAFRRequests()` to handle pre-approved requests:
+  ```typescript
+  // For Auto-Approve or Budget Review approved requests:
+  // - Set Status cell to "Approved"
+  // - Set Final Amount to request amount
+  // - Set Notes column to financeRoute ("Auto-Approve" or "Budget Review")
+  ```
+- Modify `addReallocationRequests()` similarly
+
+##### 4. Update XLSX Generator (`lib/xlsx-generator.ts`)
+- Same logic as spreadsheet-merger for standalone generation
+
+##### 5. Update API Route (`app/api/merge-spreadsheet/route.ts`)
+- Accept CSVs with approved + pending requests
+- Filter out Denied and "Finance Review" route requests
+- Pass `isPreApproved` flag based on approvalStatus
+
+##### 6. Update UI (`components/merge-master-form.tsx`)
+- Update label from "Pending Requests CSV" to "Budget Requests CSV"
+- Update help text to explain all request types are accepted
+- Add info about what gets excluded (Denied, Finance Review)
+
+#### Data Flow for AFR Rows
+
+| Request Status | Finance Route | Status Cell | Final Amount Cell | Notes Cell |
+|---------------|---------------|-------------|-------------------|------------|
+| Pending | Sunday Meeting | (blank) | (blank) | Description from CSV |
+| Approved | Auto-Approve | "Approved" | $amount | "Auto-Approve: [Description]" |
+| Approved | Budget Review | "Approved" | $amount | "Budget Review: [Description]" |
+| Approved | Sunday Meeting | (blank) | (blank) | Description from CSV (shouldn't happen) |
+| Denied | Any | EXCLUDED | EXCLUDED | EXCLUDED |
+| Any | Finance Review | EXCLUDED | EXCLUDED | EXCLUDED |
+
+**Notes Column Format:**
+- For Pending (Sunday Meeting): Just the treasurer's description from CSV
+- For Pre-approved: "[Finance Route]: [Description]" (e.g., "Auto-Approve: GBM refreshments for spring semester")
+- This allows the PPTX generator to extract both the finance route and description from a single column
+
+---
+
+### Change 2: Slideshow from Weekly Spreadsheet
+
+#### Current Behavior
+```
+CSV (Approved) → PPTX
+```
+
+#### New Behavior
+```
+XLSX (Weekly Spreadsheet) → Parse weeks by date → Week selector → PPTX
+  - User uploads completed weekly spreadsheet
+  - System parses and identifies week boundaries (by Date of Meeting column)
+  - UI shows available weeks with tabs/dropdown
+  - User selects week (default: most recent)
+  - Generate PPTX for selected week showing ALL requests (Approved + Denied)
+```
+
+#### Implementation Details
+
+##### 1. Create XLSX Parser (`lib/xlsx-parser.ts`)
+New module to read and parse the weekly spreadsheet:
+
+```typescript
+interface ParsedWeek {
+  date: string;           // "2/1", "2/8", etc. (extracted from "Week of X" header)
+  dateISO: string;        // "2026-02-01"
+  afrRequests: SpreadsheetRow[];
+  reallocationRequests: SpreadsheetRow[];
+}
+
+interface SpreadsheetRow {
+  organization: string;
+  requestedAmount: number;
+  amendedAmount: number | null;
+  afterAmendments: number | null;
+  status: 'Approved' | 'Denied' | null;
+  finalAmount: number;
+  notes: string;          // Contains treasurer's description from CSV
+  accountNumber: string;
+}
+
+function parseWeeklySpreadsheet(buffer: ArrayBuffer): ParsedWeek[];
+```
+
+**Week Detection Logic:**
+- Scan for section header rows matching pattern: `"Week of X"` (e.g., "Week of 2/1", "Week of 2/8")
+- Each "Week of X" row starts a new week section
+- All data rows until the next "Week of X" (or end of sheet) belong to that week
+- Skip subtotal/remaining budget rows (identified by "Weekly Subtotal" or "Remaining Budget" text)
+
+##### 2. Create Presentation Request Type (`types/presentation-request.ts`)
+```typescript
+interface PresentationRequest {
+  organizationName: string;
+  displayName: string;
+  requestedAmount: number;
+  finalAmount: number;
+  status: 'Approved' | 'Denied';
+  description: string;        // From Notes column (treasurer's description from CSV)
+  financeRoute: string;       // From Notes if Auto-Approve/Budget Review, else "Sunday Meeting"
+  requestType: 'AFR' | 'Reallocation';
+  wasAmended: boolean;        // true if finalAmount !== requestedAmount
+}
+```
+
+**Notes/Description Handling:**
+- The Notes column in the spreadsheet will contain the treasurer's original description from the CSV
+- For pre-approved requests (Auto-Approve/Budget Review), Notes will contain the finance route
+- When generating PPTX: use Notes as description; if empty, leave description blank on slide
+
+##### 3. Update PPTX Generator (`lib/pptx-generator.ts`)
+- Accept `PresentationRequest[]` (different from `BudgetRequest`)
+- Update slide layout to show:
+  - Organization name (with numbering if applicable)
+  - Requested Amount (only if different from Final Amount)
+  - Final Amount (prominent)
+  - Status badge (green "Approved" or red "Denied")
+  - Finance Route badge
+  - Notes/Description
+- Add visual differentiation for Denied requests (red border or strikethrough amount)
+
+##### 4. Create New API Route (`app/api/parse-spreadsheet/route.ts`)
+```typescript
+// POST /api/parse-spreadsheet
+// Input: FormData with .xlsx file
+// Output: { weeks: ParsedWeek[] }
+```
+
+##### 5. Create New API Route (`app/api/generate-pptx-from-xlsx/route.ts`)
+```typescript
+// POST /api/generate-pptx-from-xlsx
+// Input: FormData with .xlsx file + weekDate: string
+// Output: Binary .pptx file
+```
+
+##### 6. Create Week Selector Component (`components/week-selector.tsx`)
+```typescript
+interface WeekSelectorProps {
+  weeks: { date: string; requestCount: number }[];
+  selectedWeek: string;
+  onWeekChange: (date: string) => void;
+}
+```
+- Display as tabs or dropdown
+- Show date + request count per week
+- Default to most recent week
+
+##### 7. Update Main Page (`app/page.tsx`)
+- Remove CSV file upload for Senate Presentations section
+- Add XLSX file upload instead
+- Add week selector after file is parsed
+- Update download button to call new API endpoint
+
+#### Slide Layout for New PPTX
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ [Stevens Red Header Bar]                    1 of 15     │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Organization Name                                      │
+│  ══════════════════                                     │
+│                                                         │
+│  Requested: $500.00  →  Final: $450.00    [APPROVED]   │
+│                       OR                                │
+│  Final: $500.00                           [APPROVED]   │
+│  (if no amendment)                                      │
+│                                                         │
+│  [Sunday Meeting]  [AFR]                               │
+│  ─────────────────────────                             │
+│                                                         │
+│  Description:                                          │
+│  Lorem ipsum dolor sit amet, consectetur adipiscing... │
+│  (from Notes column - omit section entirely if empty)  │
+│                                                         │
+├─────────────────────────────────────────────────────────┤
+│ [Stevens Red Footer Bar]                               │
+└─────────────────────────────────────────────────────────┘
+```
+
+For Denied requests:
+```
+┌─────────────────────────────────────────────────────────┐
+│ [Stevens Red Header Bar]                    5 of 15     │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Organization Name                                      │
+│  ══════════════════                                     │
+│                                                         │
+│  Requested: $500.00  →  Final: $0.00      [DENIED]     │
+│                                           (red badge)   │
+│                                                         │
+│  [Sunday Meeting]  [AFR]                               │
+│  ─────────────────────────                             │
+│                                                         │
+│  Description:                                          │
+│  Original request description...                       │
+│  (from Notes column - omit section entirely if empty)  │
+│                                                         │
+├─────────────────────────────────────────────────────────┤
+│ [Stevens Red Footer Bar]                               │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+### UI Changes Summary
+
+#### Senate Presentation Section (Top)
+
+**Before:**
+```
+Step 1: Upload Approved Requests CSV
+[Drag & Drop CSV]
+→ Preview Data
+→ [Download PPTX]
+```
+
+**After:**
+```
+Step 1: Upload Weekly Spreadsheet
+[Drag & Drop XLSX - your completed budget review spreadsheet]
+
+Step 2: Select Week
+[Tab: 2/1] [Tab: 2/8] [Tab: 2/15 (selected)]
+         ↑ most recent, default selected
+
+Step 3: Preview & Download
+[Preview showing requests for selected week]
+→ 8 requests (6 Approved, 2 Denied)
+→ [Download PPTX for 2/15 Meeting]
+```
+
+#### Sunday Meeting Section (Bottom - Merge Form)
+
+**Before:**
+```
+- Master Spreadsheet (optional)
+- Pending Requests CSV *
+- Meeting Date
+→ [Merge & Download]
+```
+
+**After:**
+```
+- Master Spreadsheet (optional)
+- Budget Requests CSV *
+  (includes Auto-Approved, Budget Review, and Sunday Meeting requests)
+  ℹ️ Denied and late submissions (Finance Review) are automatically excluded
+- Meeting Date
+→ [Merge & Download]
+```
+
+---
+
+### Implementation Phases
+
+#### Phase 3.1: Spreadsheet Enhancement (1-2 days)
+1. Update types for new CSVType `'all'`
+2. Update CSV validator to accept all request types
+3. Add filtering logic for Denied/Finance Review
+4. Update spreadsheet-merger to pre-fill approved requests
+5. Update xlsx-generator similarly
+6. Update merge-spreadsheet API route
+7. Update merge-master-form UI labels and help text
+8. Test with sample CSV containing mixed request types
+
+#### Phase 3.2: XLSX Parser (1 day)
+1. Create `lib/xlsx-parser.ts`
+2. Implement week boundary detection by Date of Meeting column
+3. Parse AFR and Reallocation sheets
+4. Return structured `ParsedWeek[]` data
+5. Unit test with sample spreadsheet
+
+#### Phase 3.3: Week Selector UI (0.5 days)
+1. Create `components/week-selector.tsx`
+2. Add tab-style week selection
+3. Show request counts per week
+4. Default to most recent week
+5. Connect to parent state
+
+#### Phase 3.4: New PPTX Generator (1 day)
+1. Create `types/presentation-request.ts`
+2. Update `lib/pptx-generator.ts` to handle new input type
+3. Update slide layout for amended amounts
+4. Add Denied status styling
+5. Add status badges (Approved green, Denied red)
+6. Test slide generation
+
+#### Phase 3.5: API Routes & Integration (0.5 days)
+1. Create `/api/parse-spreadsheet` route
+2. Create `/api/generate-pptx-from-xlsx` route
+3. Update main page to use new workflow
+4. End-to-end testing
+
+#### Phase 3.6: Testing & Polish (0.5 days)
+1. Test with real weekly spreadsheet data
+2. Edge cases (empty weeks, single request, etc.)
+3. Error handling improvements
+4. Update help text and tooltips
+
+**Total Estimated Time: 4-5 days**
+
+---
+
+### File Changes Summary
+
+| File | Action | Description |
+|------|--------|-------------|
+| `types/budget-request.ts` | Modify | Add `'all'` to CSVType |
+| `types/presentation-request.ts` | Create | New type for PPTX from spreadsheet |
+| `lib/csv-validator.ts` | Modify | Accept all request types, add filters |
+| `lib/spreadsheet-merger.ts` | Modify | Pre-fill approved requests |
+| `lib/xlsx-generator.ts` | Modify | Same as spreadsheet-merger |
+| `lib/xlsx-parser.ts` | Create | Parse weekly spreadsheet |
+| `lib/pptx-generator.ts` | Modify | New slide layout, handle PresentationRequest |
+| `app/api/merge-spreadsheet/route.ts` | Modify | Handle all request types |
+| `app/api/parse-spreadsheet/route.ts` | Create | Parse XLSX and return weeks |
+| `app/api/generate-pptx-from-xlsx/route.ts` | Create | Generate PPTX from spreadsheet week |
+| `components/week-selector.tsx` | Create | Week tab selection component |
+| `components/merge-master-form.tsx` | Modify | Update labels and help text |
+| `app/page.tsx` | Modify | New Senate Presentation workflow |
+| `AGENTS.md` | Modify | Update documentation |
+
+---
+
+### Testing Checklist
+
+#### Spreadsheet Generation
+- [x] CSV with only Pending requests works as before
+- [x] CSV with Pending + Auto-Approved correctly pre-fills
+- [x] CSV with Budget Review approved correctly pre-fills
+- [x] Denied requests are excluded
+- [x] "Finance Review" route requests are excluded
+- [x] Notes column shows finance route for pre-approved
+- [x] Org numbering still works correctly
+
+#### Slideshow Generation
+- [x] XLSX with single week parses correctly
+- [x] XLSX with multiple weeks shows all in selector
+- [x] Most recent week is default selected
+- [x] Approved requests show green badge (verified PPTX generated)
+- [x] Denied requests show red badge (code verified, needs visual test)
+- [x] Amended amounts show "Requested → Final" format (code verified)
+- [x] Non-amended amounts show only Final (code verified)
+- [x] Org numbering preserved from spreadsheet
+
+#### Bug Fixes Applied
+- [x] Fixed CSV parser to handle "Rellocation" typo (missing 'a')
+- [x] Fixed spreadsheet-merger to add "Week of X" headers for Reallocation sheets
 
 ---
 
@@ -716,3 +1124,4 @@ npm run dev
 |------|---------|---------|
 | 2026-01-09 | 1.0 | Initial plan created |
 | 2026-01-09 | 1.1 | Added Phase 2: Master Spreadsheet Management specification |
+| 2026-02-03 | 2.0 | Added Phase 3: Post-Meeting Workflow Improvements - enhanced spreadsheet generation and XLSX-to-PPTX workflow |
